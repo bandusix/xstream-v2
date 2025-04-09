@@ -43,6 +43,25 @@ const authenticateBasic = (req, res, next) => {
       return res.status(401).json({ message: '认证失败' });
     }
     
+    // 检查是否是XStream连接的用户名和密码
+    const xstreamConnectionsFilePath = path.join(__dirname, '../../data/xstream_connections.json');
+    if (fs.existsSync(xstreamConnectionsFilePath)) {
+      const connections = JSON.parse(fs.readFileSync(xstreamConnectionsFilePath, 'utf8'));
+      const connection = connections.find(conn => conn.username === username && conn.password === password);
+      
+      if (connection) {
+        // 从用户数据中获取完整用户信息
+        const usersData = JSON.parse(fs.readFileSync(usersFilePath, 'utf8'));
+        const user = usersData.find(u => u.id === connection.userId);
+        
+        if (user) {
+          req.user = { id: user.id, username: user.username };
+          return next();
+        }
+      }
+    }
+    
+    // 如果不是XStream连接，检查普通用户
     const usersData = JSON.parse(fs.readFileSync(usersFilePath, 'utf8'));
     const user = usersData.find(u => u.username === username);
     

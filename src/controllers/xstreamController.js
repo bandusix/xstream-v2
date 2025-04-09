@@ -55,8 +55,56 @@ const generateXstreamConnection = (req, res) => {
       return res.status(403).json({ message: '无权访问此播放列表' });
     }
     
-    // 生成XStream连接
-    const serverAddress = process.env.SERVER_ADDRESS || `http://localhost:${process.env.PORT || 3000}`;
+    // 生成XStream连接 - 动态获取当前部署域名
+    let serverAddress;
+    let serverPort = process.env.PORT || 3000;
+    
+    // Railway环境变量处理 - 优先级从高到低
+    if (process.env.RAILWAY_STATIC_URL) {
+      // 使用Railway提供的静态URL（已包含完整URL和端口）
+      serverAddress = process.env.RAILWAY_STATIC_URL;
+      console.log(`[Railway部署] 使用Railway静态URL: ${serverAddress}`);
+    } else if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+      // 使用Railway提供的公共域名（Railway自动处理HTTPS和端口）
+      serverAddress = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+      console.log(`[Railway部署] 使用Railway公共域名: ${serverAddress}`);
+    } else if (process.env.SERVER_ADDRESS) {
+      // 使用自定义服务器地址（完整的自定义地址，包含协议和可能的端口）
+      serverAddress = process.env.SERVER_ADDRESS;
+      console.log(`[自定义部署] 使用SERVER_ADDRESS环境变量: ${serverAddress}`);
+    } else if (process.env.HOST) {
+      // 使用HOST环境变量
+      const protocol = process.env.HTTPS === 'true' ? 'https' : 'http';
+      serverAddress = `${protocol}://${process.env.HOST}`;
+      // 只有在非标准端口时才添加端口号
+      const isStandardPort = (protocol === 'http' && serverPort === 80) || 
+                            (protocol === 'https' && serverPort === 443);
+      if (!isStandardPort) {
+        serverAddress += `:${serverPort}`;
+      }
+      console.log(`[标准部署] 使用HOST环境变量: ${serverAddress}`);
+    } else {
+      // 从请求头中提取域名
+      const host = req.get('host');
+      if (host) {
+        // 检查是否已包含协议
+        const protocol = req.protocol || (req.get('x-forwarded-proto') || 'http');
+        serverAddress = host.includes('://') ? host : `${protocol}://${host}`;
+        console.log(`[动态检测] 从请求头获取域名: ${serverAddress}`);
+      } else {
+        // 默认回退地址
+        serverAddress = `http://localhost:${serverPort}`;
+        console.log(`[本地开发] 使用默认回退地址: ${serverAddress}`);
+      }
+    }
+    
+    // 确保地址格式正确
+    if (!serverAddress.startsWith('http://') && !serverAddress.startsWith('https://')) {
+      serverAddress = `http://${serverAddress}`;
+    }
+    
+    // 记录最终使用的服务器地址
+    console.log(`最终使用的服务器地址: ${serverAddress}`);
     const username = `user_${req.user.id.substring(0, 8)}`;
     const password = generateRandomPassword();
     
