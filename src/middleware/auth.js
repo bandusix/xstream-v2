@@ -28,18 +28,31 @@ const authenticateBasic = (req, res, next) => {
   // 获取Authorization头
   const authHeader = req.headers.authorization;
   
+  // 记录认证请求信息（不包含敏感信息）
+  console.log('XStream认证请求:', {
+    url: req.originalUrl,
+    query: req.query,
+    method: req.method,
+    hasAuth: !!authHeader
+  });
+  
   if (!authHeader || !authHeader.startsWith('Basic ')) {
+    console.log('认证失败: 缺少Basic认证头');
+    // 返回401但不发送WWW-Authenticate头，避免浏览器弹出认证框
     return res.status(401).json({ message: '需要基本认证' });
   }
   
   // 解码Base64编码的凭据
-  const base64Credentials = authHeader.split(' ')[1];
-  const credentials = Buffer.from(base64Credentials, 'base64').toString('utf8');
-  const [username, password] = credentials.split(':');
-  
-  // 验证用户
   try {
+    const base64Credentials = authHeader.split(' ')[1];
+    const credentials = Buffer.from(base64Credentials, 'base64').toString('utf8');
+    const [username, password] = credentials.split(':');
+    
+    console.log(`尝试认证用户: ${username}`);
+    
+    // 验证用户
     if (!fs.existsSync(usersFilePath)) {
+      console.log('认证失败: 用户数据文件不存在');
       return res.status(401).json({ message: '认证失败' });
     }
     
@@ -50,14 +63,19 @@ const authenticateBasic = (req, res, next) => {
       const connection = connections.find(conn => conn.username === username && conn.password === password);
       
       if (connection) {
+        console.log(`找到匹配的XStream连接: ${connection.id}`);
         // 从用户数据中获取完整用户信息
         const usersData = JSON.parse(fs.readFileSync(usersFilePath, 'utf8'));
         const user = usersData.find(u => u.id === connection.userId);
         
         if (user) {
+          console.log(`XStream认证成功: 用户 ${user.username}`);
           req.user = { id: user.id, username: user.username };
+          req.xstreamConnection = connection; // 保存XStream连接信息以供后续使用
           return next();
         }
+      } else {
+        console.log('未找到匹配的XStream连接');
       }
     }
     
@@ -66,9 +84,11 @@ const authenticateBasic = (req, res, next) => {
     const user = usersData.find(u => u.username === username);
     
     if (!user || user.password !== password) { // 注意：实际应用中应使用bcrypt比较
+      console.log('认证失败: 用户名或密码错误');
       return res.status(401).json({ message: '用户名或密码错误' });
     }
     
+    console.log(`普通用户认证成功: ${user.username}`);
     req.user = { id: user.id, username: user.username };
     next();
   } catch (error) {

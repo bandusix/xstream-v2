@@ -32,6 +32,12 @@ app.use('/api/auth', authRoutes);
 app.use('/api/playlist', playlistRoutes);
 app.use('/api/xstream', xstreamRoutes);
 
+// 添加XStream IPTV客户端API根路径支持
+// 这是为了兼容TiviMate和xciptv等客户端，它们期望直接访问/player_api.php
+const { authenticateBasic } = require('./middleware/auth');
+const { handleXstreamRequest } = require('./controllers/xstreamController');
+app.get('/player_api.php', authenticateBasic, handleXstreamRequest);
+
 // 首页路由
 app.get('/', (req, res) => {
   res.send('XStream IPTV Server is running!');
