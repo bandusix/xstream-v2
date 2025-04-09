@@ -279,7 +279,6 @@ const handleXstreamRequest = (req, res) => {
       case 'get_short_epg':
         // 重定向到type处理逻辑
         req.query.type = action;
-        // 继续执行type处理逻辑（不中断）
         break;
       default:
         return res.json({ action, status: 'ok' });
@@ -287,134 +286,134 @@ const handleXstreamRequest = (req, res) => {
   }
 
   // 处理type参数的请求
-  if (type) {
-    console.log(`处理type请求: ${type}`);
-    switch (type) {
-      case 'get_vod_categories':
-        // 返回VOD分类
-        res.json([]);
-        break;
-      case 'get_live_categories':
-        // 返回直播分类
-        // 从用户的播放列表中提取分类
-        try {
-          // 获取用户的播放列表
-          const playlists = JSON.parse(fs.readFileSync(playlistsFilePath, 'utf8'));
-          const userPlaylists = playlists.filter(p => p.userId === req.user.id);
-          
-          if (userPlaylists.length === 0) {
-            console.log('未找到用户播放列表');
-            return res.json([]);
-          }
-          
-          // 使用第一个播放列表
-          const playlistId = userPlaylists[0].id;
-          const playlistContentPath = path.join(playlistsContentDir, `${playlistId}.json`);
-          
-          if (!fs.existsSync(playlistContentPath)) {
-            console.log(`播放列表内容文件不存在: ${playlistContentPath}`);
-            return res.json([]);
-          }
-          
-          const channels = JSON.parse(fs.readFileSync(playlistContentPath, 'utf8'));
-          console.log(`找到 ${channels.length} 个频道`);
-          
-          // 提取唯一的分类
-          const categories = [...new Set(channels.map(channel => channel.group))];
-          console.log(`提取 ${categories.length} 个分类`);
-          
-          // 格式化为XStream格式
-          const formattedCategories = categories.map(category => ({
-            category_id: category,
-            category_name: category,
-            parent_id: 0
-          }));
-          
-          res.json(formattedCategories);
-        } catch (error) {
-          console.error('获取直播分类错误:', error);
-          res.json([]);
+  if (req.query.type) {
+  console.log(`处理type请求: ${type}`);
+  switch (type) {
+    case 'get_vod_categories':
+      // 返回VOD分类
+      res.json([]);
+      break;
+    case 'get_live_categories':
+      // 返回直播分类
+      // 从用户的播放列表中提取分类
+      try {
+        // 获取用户的播放列表
+        const playlists = JSON.parse(fs.readFileSync(playlistsFilePath, 'utf8'));
+        const userPlaylists = playlists.filter(p => p.userId === req.user.id);
+        
+        if (userPlaylists.length === 0) {
+          console.log('未找到用户播放列表');
+          return res.json([]);
         }
-        break;
-      case 'get_live_streams':
-        // 返回直播流
-        try {
-          const { category_id } = req.query;
-          console.log(`获取直播流, 分类ID: ${category_id || '所有'}`);
-          
-          // 获取用户的播放列表
-          const playlists = JSON.parse(fs.readFileSync(playlistsFilePath, 'utf8'));
-          const userPlaylists = playlists.filter(p => p.userId === req.user.id);
-          
-          if (userPlaylists.length === 0) {
-            console.log('未找到用户播放列表');
-            return res.json([]);
-          }
-          
-          // 使用第一个播放列表
-          const playlistId = userPlaylists[0].id;
-          const playlistContentPath = path.join(playlistsContentDir, `${playlistId}.json`);
-          
-          if (!fs.existsSync(playlistContentPath)) {
-            console.log(`播放列表内容文件不存在: ${playlistContentPath}`);
-            return res.json([]);
-          }
-          
-          const channels = JSON.parse(fs.readFileSync(playlistContentPath, 'utf8'));
-          console.log(`找到 ${channels.length} 个频道`);
-          
-          // 过滤指定分类的频道
-          const filteredChannels = category_id ? 
-            channels.filter(channel => channel.group === category_id) : 
-            channels;
-          
-          console.log(`过滤后 ${filteredChannels.length} 个频道`);
-          
-          // 格式化为XStream格式
-          const formattedChannels = filteredChannels.map((channel, index) => ({
-            num: index + 1,
-            name: channel.title,
-            stream_type: 'live',
-            stream_id: index + 1,
-            stream_icon: channel.logo || '',
-            epg_channel_id: channel.title,
-            added: new Date().toISOString().split('T')[0],
-            category_id: channel.group,
-            custom_sid: '',
-            tv_archive: 0,
-            direct_source: channel.url,
-            tv_archive_duration: 0
-          }));
-          
-          res.json(formattedChannels);
-        } catch (error) {
-          console.error('获取直播流错误:', error);
-          res.json([]);
+        
+        // 使用第一个播放列表
+        const playlistId = userPlaylists[0].id;
+        const playlistContentPath = path.join(playlistsContentDir, `${playlistId}.json`);
+        
+        if (!fs.existsSync(playlistContentPath)) {
+          console.log(`播放列表内容文件不存在: ${playlistContentPath}`);
+          return res.json([]);
         }
-        break;
-      case 'get_vod_streams':
-        // 返回VOD流
+        
+        const channels = JSON.parse(fs.readFileSync(playlistContentPath, 'utf8'));
+        console.log(`找到 ${channels.length} 个频道`);
+        
+        // 提取唯一的分类
+        const categories = [...new Set(channels.map(channel => channel.group))];
+        console.log(`提取 ${categories.length} 个分类`);
+        
+        // 格式化为XStream格式
+        const formattedCategories = categories.map(category => ({
+          category_id: category,
+          category_name: category,
+          parent_id: 0
+        }));
+        
+        res.json(formattedCategories);
+      } catch (error) {
+        console.error('获取直播分类错误:', error);
         res.json([]);
-        break;
-      case 'get_vod_info':
-        // 返回VOD信息
-        res.json({});
-        break;
-      case 'get_short_epg':
-        // 返回短EPG
-        res.json({});
-        break;
-      case 'get_simple_data_table':
-        // 返回简单数据表
+      }
+      break;
+    case 'get_live_streams':
+      // 返回直播流
+      try {
+        const { category_id } = req.query;
+        console.log(`获取直播流, 分类ID: ${category_id || '所有'}`);
+        
+        // 获取用户的播放列表
+        const playlists = JSON.parse(fs.readFileSync(playlistsFilePath, 'utf8'));
+        const userPlaylists = playlists.filter(p => p.userId === req.user.id);
+        
+        if (userPlaylists.length === 0) {
+          console.log('未找到用户播放列表');
+          return res.json([]);
+        }
+        
+        // 使用第一个播放列表
+        const playlistId = userPlaylists[0].id;
+        const playlistContentPath = path.join(playlistsContentDir, `${playlistId}.json`);
+        
+        if (!fs.existsSync(playlistContentPath)) {
+          console.log(`播放列表内容文件不存在: ${playlistContentPath}`);
+          return res.json([]);
+        }
+        
+        const channels = JSON.parse(fs.readFileSync(playlistContentPath, 'utf8'));
+        console.log(`找到 ${channels.length} 个频道`);
+        
+        // 过滤指定分类的频道
+        const filteredChannels = category_id ? 
+          channels.filter(channel => channel.group === category_id) : 
+          channels;
+        
+        console.log(`过滤后 ${filteredChannels.length} 个频道`);
+        
+        // 格式化为XStream格式
+        const formattedChannels = filteredChannels.map((channel, index) => ({
+          num: index + 1,
+          name: channel.title,
+          stream_type: 'live',
+          stream_id: index + 1,
+          stream_icon: channel.logo || '',
+          epg_channel_id: channel.title,
+          added: new Date().toISOString().split('T')[0],
+          category_id: channel.group,
+          custom_sid: '',
+          tv_archive: 0,
+          direct_source: channel.url,
+          tv_archive_duration: 0
+        }));
+        
+        res.json(formattedChannels);
+      } catch (error) {
+        console.error('获取直播流错误:', error);
         res.json([]);
-        break;
-      default:
-        res.json({ type, status: 'ok' });
-    }
-  } else if (!action) {
-    // 如果既没有type也没有action参数，返回一个通用响应
-    res.json({ status: 'ok' });
+      }
+      break;
+    case 'get_vod_streams':
+      // 返回VOD流
+      res.json([]);
+      break;
+    case 'get_vod_info':
+      // 返回VOD信息
+      res.json({});
+      break;
+    case 'get_short_epg':
+      // 返回短EPG
+      res.json({});
+      break;
+    case 'get_simple_data_table':
+      // 返回简单数据表
+      res.json([]);
+      break;
+    default:
+      res.json({ type, status: 'ok' });
   }
+} else if (!action) {
+  // 如果既没有type也没有action参数，返回一个通用响应
+  res.json({ status: 'ok' });
+}
 };
 
 module.exports = {
