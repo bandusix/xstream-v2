@@ -1,0 +1,29 @@
+{
+  "name": "xstream-iptv-server",
+  "version": "1.0.0",
+  "description": "服务器命令行脚本，用于生成xstream iptv播放列表",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "keywords": ["iptv", "xstream", "m3u", "playlist"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.2",
+    "bcrypt": "^5.1.1",
+    "dotenv": "^16.3.1",
+    "m3u8-parser": "^6.2.0",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
