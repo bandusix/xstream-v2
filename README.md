@@ -33,6 +33,32 @@ cd xstream-v2
 npm install
 ```
 
+如果npm命令无法正常工作，可以尝试以下替代方法：
+
+```bash
+# 使用yarn安装
+yarn install
+
+# 或使用npx
+npx npm install
+
+# 或单独安装关键依赖
+npm install express jsonwebtoken bcrypt dotenv axios m3u8-parser body-parser cors uuid
+```
+
+如果npm命令无法正常工作，可以尝试以下替代方法：
+
+```bash
+# 使用yarn安装
+yarn install
+
+# 或使用npx
+npx npm install
+
+# 或单独安装关键依赖
+npm install express jsonwebtoken bcrypt dotenv axios m3u8-parser body-parser cors uuid
+```
+
 3. 创建环境变量文件
 
 在项目根目录创建 `.env` 文件，添加以下内容：
@@ -47,6 +73,48 @@ JWT_SECRET=your_secret_key_here
 ```bash
 npm start
 ```
+
+## 故障排除
+
+### 依赖安装问题
+
+如果遇到`Error: Cannot find module 'express'`或类似错误，表示依赖项未正确安装。请尝试以下解决方法：
+
+1. 确保Node.js已正确安装并且版本>=14.0.0
+   ```bash
+   node -v
+   ```
+
+2. 尝试使用管理员权限运行命令提示符或PowerShell，然后执行安装命令
+
+3. 如果npm命令失败，尝试以下替代安装方法：
+   ```bash
+   # 使用yarn（如已安装）
+   yarn install
+   
+   # 或使用npx
+   npx --yes npm install
+   
+   # 或手动安装关键依赖
+   npm install express
+   npm install jsonwebtoken bcrypt dotenv
+   npm install axios m3u8-parser body-parser cors uuid
+   ```
+
+4. 检查npm配置是否正确
+   ```bash
+   npm config list
+   ```
+
+5. 如果Node.js安装损坏，考虑重新安装Node.js
+
+### 服务器无法启动
+
+如果服务器无法启动，请检查：
+
+1. 所有依赖项是否已安装
+2. 端口3000是否被占用（可在.env文件中修改PORT值）
+3. 查看控制台错误信息以获取更多详情
 
 开发模式（自动重启）：
 

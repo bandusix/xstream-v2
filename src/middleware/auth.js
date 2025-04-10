@@ -33,11 +33,13 @@ const authenticateBasic = (req, res, next) => {
     url: req.originalUrl,
     query: req.query,
     method: req.method,
-    hasAuth: !!authHeader
+    hasAuth: !!authHeader,
+    authType: authHeader ? authHeader.split(' ')[0] : 'none'
   });
   
   if (!authHeader || !authHeader.startsWith('Basic ')) {
-    console.log('认证失败: 缺少Basic认证头');
+    console.error('认证失败: 缺少Basic认证头或格式不正确');
+    console.log('收到的Authorization头:', authHeader ? authHeader.substring(0, 20) + '...' : 'undefined');
     // 返回401但不发送WWW-Authenticate头，避免浏览器弹出认证框
     return res.status(401).json({ message: '需要基本认证' });
   }

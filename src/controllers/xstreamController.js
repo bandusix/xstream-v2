@@ -225,9 +225,31 @@ const handleXstreamRequest = (req, res) => {
   console.log('XStream API请求:', {
     url: req.originalUrl,
     query: req.query,
-    headers: req.headers,
+    method: req.method,
+    auth_header: req.headers.authorization ? '存在' : '不存在',
     user: req.user ? req.user.username : 'unknown'
   });
+  
+  // 检查用户认证是否成功
+  if (!req.user) {
+    console.error('认证失败: 用户信息不存在');
+    return res.status(401).json({ message: '认证失败' });
+  }
+  
+  console.log('认证成功，用户信息:', {
+    id: req.user.id,
+    username: req.user.username
+  });
+  
+  // 检查XStream连接信息
+  if (req.xstreamConnection) {
+    console.log('XStream连接信息:', {
+      id: req.xstreamConnection.id,
+      playlistId: req.xstreamConnection.playlistId
+    });
+  } else {
+    console.log('警告: 没有找到XStream连接信息，将尝试使用用户的默认播放列表');
+  }
   
   // 如果没有提供action或type参数，返回用户信息和服务器状态
   // 这是客户端初始连接测试时的预期响应
@@ -381,7 +403,7 @@ const handleXstreamRequest = (req, res) => {
         
         // 检查播放列表文件是否存在
         if (!fs.existsSync(playlistsFilePath)) {
-          console.log(`播放列表索引文件不存在: ${playlistsFilePath}`);
+          console.error(`播放列表索引文件不存在: ${playlistsFilePath}`);
           // 确保目录存在
           const dataDir = path.dirname(playlistsFilePath);
           if (!fs.existsSync(dataDir)) {
@@ -399,13 +421,19 @@ const handleXstreamRequest = (req, res) => {
         if (req.xstreamConnection && req.xstreamConnection.playlistId) {
           playlistId = req.xstreamConnection.playlistId;
           console.log(`使用XStream连接指定的播放列表ID: ${playlistId}`);
+          
+          // 验证播放列表是否存在
+          const playlistExists = playlists.some(p => p.id === playlistId);
+          if (!playlistExists) {
+            console.error(`XStream连接指定的播放列表ID ${playlistId} 不存在于播放列表索引中`);
+          }
         } else {
           // 否则使用用户的第一个播放列表
           const userPlaylists = playlists.filter(p => p.userId === req.user.id);
           console.log(`用户拥有 ${userPlaylists.length} 个播放列表`);
           
           if (userPlaylists.length === 0) {
-            console.log('未找到用户播放列表');
+            console.error('未找到用户播放列表，请先导入播放列表');
             return res.json([]);
           }
           
@@ -422,12 +450,30 @@ const handleXstreamRequest = (req, res) => {
         console.log(`播放列表内容路径: ${playlistContentPath}`);
         
         if (!fs.existsSync(playlistContentPath)) {
-          console.log(`播放列表内容文件不存在: ${playlistContentPath}`);
+          console.error(`播放列表内容文件不存在: ${playlistContentPath}`);
+          console.error('可能原因: 播放列表已被删除或未正确导入');
           return res.json([]);
         }
         
-        const channels = JSON.parse(fs.readFileSync(playlistContentPath, 'utf8'));
+        let channels;
+        try {
+          const fileContent = fs.readFileSync(playlistContentPath, 'utf8');
+          if (!fileContent || fileContent.trim() === '') {
+            console.error(`播放列表内容文件为空: ${playlistContentPath}`);
+            return res.json([]);
+          }
+          channels = JSON.parse(fileContent);
+        } catch (parseError) {
+          console.error(`解析播放列表内容文件错误: ${parseError.message}`);
+          return res.json([]);
+        }
+        
         console.log(`找到 ${channels.length} 个频道`);
+        
+        if (channels.length === 0) {
+          console.error('播放列表中没有频道');
+          return res.json([]);
+        }
         
         // 获取分类映射表（从数字ID到分类名称）
         const categoryMap = {};
@@ -471,6 +517,12 @@ const handleXstreamRequest = (req, res) => {
             }
           }
           
+          // 检查频道URL是否存在
+          if (!channel.url) {
+            console.error(`频道 ${channel.title || 'Unknown'} 没有URL`);
+            return null; // 跳过没有URL的频道
+          }
+          
           return {
             num: index + 1,
             name: channel.title || 'Unknown Channel',
@@ -485,12 +537,13 @@ const handleXstreamRequest = (req, res) => {
             direct_source: channel.url,
             tv_archive_duration: 0
           };
-        });
+        }).filter(channel => channel !== null); // 过滤掉无效的频道
         
         console.log(`返回 ${formattedChannels.length} 个直播流`);
         res.json(formattedChannels);
       } catch (error) {
         console.error('获取直播流错误:', error);
+        console.error('错误堆栈:', error.stack);
         res.json([]);
       }
       break;
