@@ -265,7 +265,7 @@ const handleXstreamRequest = (req, res) => {
     });
   }
   
-  const { type, action } = req.query;
+  let { type, action } = req.query;
   
   // 处理action参数的请求（另一种XStream API请求方式）
   if (action) {
@@ -279,6 +279,7 @@ const handleXstreamRequest = (req, res) => {
       case 'get_short_epg':
         // 重定向到type处理逻辑
         req.query.type = action;
+        type = action; // 更新type变量以匹配更新后的req.query.type
         break;
       default:
         return res.json({ action, status: 'ok' });
