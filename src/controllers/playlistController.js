@@ -2,6 +2,8 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const multer = require('multer');
+const util = require('util');
 
 // 播放列表数据文件路径
 const playlistsFilePath = path.join(__dirname, '../../data/playlists.json');
@@ -374,9 +376,148 @@ const deletePlaylist = (req, res) => {
   }
 };
 
+// 导入M3U文件
+const importFilePlaylist = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'M3U文件是必需的' });
+    }
+
+    const { name } = req.body;
+    const filePath = req.file.path;
+    
+    console.log(`开始导入M3U文件: ${filePath}`);
+    
+    // 检查目录结构
+    const dirCreated = ensurePlaylistsFile();
+    if (!dirCreated) {
+      return res.status(500).json({ message: '无法创建必要的目录结构' });
+    }
+    
+    // 记录内存使用情况
+    const memoryBefore = process.memoryUsage();
+    console.log(`内存使用情况(开始): RSS=${Math.round(memoryBefore.rss / 1024 / 1024)}MB, Heap=${Math.round(memoryBefore.heapUsed / 1024 / 1024)}MB`);
+    
+    try {
+      // 读取上传的M3U文件内容
+      const m3uContent = fs.readFileSync(filePath, 'utf8');
+      console.log(`成功读取M3U文件内容，大小: ${m3uContent.length} 字节`);
+      
+      // 删除临时文件
+      fs.unlinkSync(filePath);
+      
+      // 记录读取后内存使用情况
+      const memoryAfterRead = process.memoryUsage();
+      console.log(`内存使用情况(读取后): RSS=${Math.round(memoryAfterRead.rss / 1024 / 1024)}MB, Heap=${Math.round(memoryAfterRead.heapUsed / 1024 / 1024)}MB`);
+      
+      // 解析M3U内容
+      const channels = parseM3U(m3uContent);
+      console.log(`解析到 ${channels.length} 个频道`);
+      
+      // 记录解析后内存使用情况
+      const memoryAfterParse = process.memoryUsage();
+      console.log(`内存使用情况(解析后): RSS=${Math.round(memoryAfterParse.rss / 1024 / 1024)}MB, Heap=${Math.round(memoryAfterParse.heapUsed / 1024 / 1024)}MB`);
+      
+      if (channels.length === 0) {
+        return res.status(400).json({ message: '无法解析播放列表或播放列表为空' });
+      }
+      
+      // 创建新播放列表记录
+      const playlistId = uuidv4();
+      const playlist = {
+        id: playlistId,
+        name: name || `播放列表 ${new Date().toLocaleString()}`,
+        source: '文件上传',
+        channelCount: channels.length,
+        importedAt: new Date().toISOString(),
+        userId: req.user.id
+      };
+      
+      // 确保目录存在
+      ensurePlaylistsFile();
+      
+      // 保存播放列表内容
+      const playlistContentPath = path.join(playlistsContentDir, `${playlistId}.json`);
+      try {
+        fs.writeFileSync(playlistContentPath, JSON.stringify(channels, null, 2), 'utf8');
+        console.log(`播放列表内容已保存到: ${playlistContentPath}`);
+      } catch (fsError) {
+        console.error('保存播放列表内容错误:', fsError);
+        return res.status(500).json({ message: '无法保存播放列表内容: ' + fsError.message });
+      }
+      
+      // 更新播放列表索引
+      try {
+        const playlists = JSON.parse(fs.readFileSync(playlistsFilePath, 'utf8'));
+        playlists.push(playlist);
+        fs.writeFileSync(playlistsFilePath, JSON.stringify(playlists, null, 2), 'utf8');
+        console.log('播放列表索引已更新');
+      } catch (indexError) {
+        console.error('更新播放列表索引错误:', indexError);
+        // 尝试删除已创建的内容文件
+        if (fs.existsSync(playlistContentPath)) {
+          try {
+            fs.unlinkSync(playlistContentPath);
+          } catch (cleanupError) {
+            console.error('清理失败的播放列表内容文件错误:', cleanupError);
+          }
+        }
+        return res.status(500).json({ message: '无法更新播放列表索引: ' + indexError.message });
+      }
+      
+      res.status(201).json({
+        message: '播放列表导入成功',
+        playlist
+      });
+      
+    } catch (fileError) {
+      console.error('读取M3U文件错误:', fileError.message);
+      return res.status(400).json({ message: `无法读取M3U文件: ${fileError.message}` });
+    }
+  } catch (error) {
+    console.error('导入播放列表错误:', error);
+    res.status(500).json({ message: '服务器错误，无法导入播放列表: ' + error.message });
+  }
+};
+
+// 配置文件上传
+const uploadConfig = () => {
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      const uploadDir = path.join(__dirname, '../../uploads');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      cb(null, `${Date.now()}-${file.originalname}`);
+    }
+  });
+
+  const fileFilter = (req, file, cb) => {
+    // 只接受.m3u和.m3u8文件
+    if (file.originalname.endsWith('.m3u') || file.originalname.endsWith('.m3u8')) {
+      cb(null, true);
+    } else {
+      cb(new Error('只支持.m3u和.m3u8文件格式'), false);
+    }
+  };
+
+  return multer({ 
+    storage, 
+    fileFilter,
+    limits: {
+      fileSize: 50 * 1024 * 1024 // 限制文件大小为50MB
+    }
+  });
+};
+
 module.exports = {
   getPlaylists,
   importPlaylist,
+  importFilePlaylist,
   getPlaylistById,
-  deletePlaylist
+  deletePlaylist,
+  uploadConfig
 };

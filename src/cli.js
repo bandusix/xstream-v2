@@ -168,6 +168,31 @@ const login = async () => {
 
 // 导入M3U播放列表
 const importPlaylist = async () => {
+  console.log('\n===== 导入播放列表 =====');
+  console.log('1. 从URL导入');
+  console.log('2. 从本地文件导入');
+  console.log('0. 返回主菜单');
+  
+  rl.question('\n请选择导入方式: ', (answer) => {
+    switch (answer) {
+      case '1':
+        importFromUrl();
+        break;
+      case '2':
+        importFromFile();
+        break;
+      case '0':
+        showMainMenu();
+        break;
+      default:
+        console.log('无效的选择，请重试');
+        importPlaylist();
+    }
+  });
+};
+
+// 从URL导入播放列表
+const importFromUrl = () => {
   rl.question('请输入M3U播放列表URL: ', (url) => {
     rl.question('请输入播放列表名称 (可选): ', async (name) => {
       try {
@@ -183,6 +208,65 @@ const importPlaylist = async () => {
           `${serverUrl}/api/playlist/import`,
           { url, name },
           { headers: { Authorization: `Bearer ${tokenData.token}` } }
+        );
+        
+        console.log('\n播放列表导入成功！');
+        console.log(`播放列表ID: ${response.data.playlist.id}`);
+        console.log(`频道数量: ${response.data.playlist.channelCount}`);
+        showMainMenu();
+      } catch (error) {
+        console.error('\n导入失败:', error.response?.data?.message || error.message);
+        showMainMenu();
+      }
+    });
+  });
+};
+
+// 从本地文件导入播放列表
+const importFromFile = () => {
+  rl.question('请输入M3U文件路径: ', (filePath) => {
+    rl.question('请输入播放列表名称 (可选): ', async (name) => {
+      try {
+        const tokenData = readToken();
+        if (!tokenData || !tokenData.token) {
+          console.log('\n请先登录');
+          showMainMenu();
+          return;
+        }
+        
+        // 检查文件是否存在
+        if (!fs.existsSync(filePath)) {
+          console.error('\n文件不存在，请检查路径');
+          showMainMenu();
+          return;
+        }
+        
+        // 检查文件扩展名
+        if (!filePath.toLowerCase().endsWith('.m3u') && !filePath.toLowerCase().endsWith('.m3u8')) {
+          console.error('\n文件格式不支持，请使用.m3u或.m3u8格式的文件');
+          showMainMenu();
+          return;
+        }
+        
+        console.log('\n正在上传播放列表文件，请稍候...');
+        
+        // 创建FormData对象
+        const FormData = require('form-data');
+        const form = new FormData();
+        form.append('file', fs.createReadStream(filePath));
+        if (name) {
+          form.append('name', name);
+        }
+        
+        const response = await axios.post(
+          `${serverUrl}/api/playlist/upload`,
+          form,
+          { 
+            headers: { 
+              Authorization: `Bearer ${tokenData.token}`,
+              ...form.getHeaders()
+            } 
+          }
         );
         
         console.log('\n播放列表导入成功！');

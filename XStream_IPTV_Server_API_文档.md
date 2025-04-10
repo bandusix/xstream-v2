@@ -184,6 +184,40 @@ IPTV客户端API使用基本认证。在Postman中设置方法：
     }'
   ```
 
+#### 上传M3U文件
+
+- **URL**: `POST /playlist/upload`
+- **认证**: Bearer Token
+- **请求类型**: `multipart/form-data`
+- **请求参数**:
+  - `file`: M3U或M3U8格式的文件（必需）
+  - `name`: 播放列表名称（可选）
+- **成功响应** (201 Created):
+  ```json
+  {
+    "message": "播放列表导入成功",
+    "playlist": {
+      "id": "playlist_uuid",
+      "name": "我的播放列表",
+      "source": "文件上传",
+      "channelCount": 100,
+      "importedAt": "2023-01-01T00:00:00.000Z"
+    }
+  }
+  ```
+- **错误响应**:
+  - 400 Bad Request: M3U文件是必需的或无法解析播放列表
+  - 401 Unauthorized: 未提供访问令牌
+  - 403 Forbidden: 无效或过期的令牌
+  - 500 Internal Server Error: 服务器错误
+- **cURL示例**:
+  ```bash
+  curl -X POST "http://localhost:3000/api/playlist/upload" \
+    -H "Authorization: Bearer jwt_token_here" \
+    -F "file=@/path/to/playlist.m3u" \
+    -F "name=我的本地播放列表"
+  ```
+
 #### 获取所有导入的播放列表
 
 - **URL**: `GET /playlist/list`
