@@ -299,17 +299,51 @@ const handleXstreamRequest = (req, res) => {
       // 从用户的播放列表中提取分类
       try {
         // 获取用户的播放列表
-        const playlists = JSON.parse(fs.readFileSync(playlistsFilePath, 'utf8'));
-        const userPlaylists = playlists.filter(p => p.userId === req.user.id);
+        console.log('正在处理get_live_categories请求');
+        console.log('用户ID:', req.user.id);
+        console.log('XStream连接:', req.xstreamConnection ? req.xstreamConnection.id : 'none');
         
-        if (userPlaylists.length === 0) {
-          console.log('未找到用户播放列表');
+        // 检查播放列表文件是否存在
+        if (!fs.existsSync(playlistsFilePath)) {
+          console.log(`播放列表索引文件不存在: ${playlistsFilePath}`);
+          // 确保目录存在
+          const dataDir = path.dirname(playlistsFilePath);
+          if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
+          }
+          fs.writeFileSync(playlistsFilePath, JSON.stringify([]), 'utf8');
           return res.json([]);
         }
         
-        // 使用第一个播放列表
-        const playlistId = userPlaylists[0].id;
+        const playlists = JSON.parse(fs.readFileSync(playlistsFilePath, 'utf8'));
+        console.log(`找到 ${playlists.length} 个播放列表`);
+        
+        // 如果有XStream连接，优先使用连接中指定的播放列表
+        let playlistId;
+        if (req.xstreamConnection && req.xstreamConnection.playlistId) {
+          playlistId = req.xstreamConnection.playlistId;
+          console.log(`使用XStream连接指定的播放列表ID: ${playlistId}`);
+        } else {
+          // 否则使用用户的第一个播放列表
+          const userPlaylists = playlists.filter(p => p.userId === req.user.id);
+          console.log(`用户拥有 ${userPlaylists.length} 个播放列表`);
+          
+          if (userPlaylists.length === 0) {
+            console.log('未找到用户播放列表');
+            return res.json([]);
+          }
+          
+          playlistId = userPlaylists[0].id;
+          console.log(`使用用户的第一个播放列表ID: ${playlistId}`);
+        }
+        
+        // 确保播放列表内容目录存在
+        if (!fs.existsSync(playlistsContentDir)) {
+          fs.mkdirSync(playlistsContentDir, { recursive: true });
+        }
+        
         const playlistContentPath = path.join(playlistsContentDir, `${playlistId}.json`);
+        console.log(`播放列表内容路径: ${playlistContentPath}`);
         
         if (!fs.existsSync(playlistContentPath)) {
           console.log(`播放列表内容文件不存在: ${playlistContentPath}`);
@@ -320,16 +354,17 @@ const handleXstreamRequest = (req, res) => {
         console.log(`找到 ${channels.length} 个频道`);
         
         // 提取唯一的分类
-        const categories = [...new Set(channels.map(channel => channel.group))];
-        console.log(`提取 ${categories.length} 个分类`);
+        const categories = [...new Set(channels.map(channel => channel.group || 'Uncategorized'))];
+        console.log(`提取 ${categories.length} 个分类: ${categories.join(', ')}`);
         
         // 格式化为XStream格式
-        const formattedCategories = categories.map(category => ({
-          category_id: category,
+        const formattedCategories = categories.map((category, index) => ({
+          category_id: String(index + 1),
           category_name: category,
           parent_id: 0
         }));
         
+        console.log(`返回 ${formattedCategories.length} 个分类`);
         res.json(formattedCategories);
       } catch (error) {
         console.error('获取直播分类错误:', error);
@@ -341,19 +376,50 @@ const handleXstreamRequest = (req, res) => {
       try {
         const { category_id } = req.query;
         console.log(`获取直播流, 分类ID: ${category_id || '所有'}`);
+        console.log('用户ID:', req.user.id);
+        console.log('XStream连接:', req.xstreamConnection ? req.xstreamConnection.id : 'none');
         
-        // 获取用户的播放列表
-        const playlists = JSON.parse(fs.readFileSync(playlistsFilePath, 'utf8'));
-        const userPlaylists = playlists.filter(p => p.userId === req.user.id);
-        
-        if (userPlaylists.length === 0) {
-          console.log('未找到用户播放列表');
+        // 检查播放列表文件是否存在
+        if (!fs.existsSync(playlistsFilePath)) {
+          console.log(`播放列表索引文件不存在: ${playlistsFilePath}`);
+          // 确保目录存在
+          const dataDir = path.dirname(playlistsFilePath);
+          if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
+          }
+          fs.writeFileSync(playlistsFilePath, JSON.stringify([]), 'utf8');
           return res.json([]);
         }
         
-        // 使用第一个播放列表
-        const playlistId = userPlaylists[0].id;
+        const playlists = JSON.parse(fs.readFileSync(playlistsFilePath, 'utf8'));
+        console.log(`找到 ${playlists.length} 个播放列表`);
+        
+        // 如果有XStream连接，优先使用连接中指定的播放列表
+        let playlistId;
+        if (req.xstreamConnection && req.xstreamConnection.playlistId) {
+          playlistId = req.xstreamConnection.playlistId;
+          console.log(`使用XStream连接指定的播放列表ID: ${playlistId}`);
+        } else {
+          // 否则使用用户的第一个播放列表
+          const userPlaylists = playlists.filter(p => p.userId === req.user.id);
+          console.log(`用户拥有 ${userPlaylists.length} 个播放列表`);
+          
+          if (userPlaylists.length === 0) {
+            console.log('未找到用户播放列表');
+            return res.json([]);
+          }
+          
+          playlistId = userPlaylists[0].id;
+          console.log(`使用用户的第一个播放列表ID: ${playlistId}`);
+        }
+        
+        // 确保播放列表内容目录存在
+        if (!fs.existsSync(playlistsContentDir)) {
+          fs.mkdirSync(playlistsContentDir, { recursive: true });
+        }
+        
         const playlistContentPath = path.join(playlistsContentDir, `${playlistId}.json`);
+        console.log(`播放列表内容路径: ${playlistContentPath}`);
         
         if (!fs.existsSync(playlistContentPath)) {
           console.log(`播放列表内容文件不存在: ${playlistContentPath}`);
@@ -363,29 +429,65 @@ const handleXstreamRequest = (req, res) => {
         const channels = JSON.parse(fs.readFileSync(playlistContentPath, 'utf8'));
         console.log(`找到 ${channels.length} 个频道`);
         
+        // 获取分类映射表（从数字ID到分类名称）
+        const categoryMap = {};
+        const uniqueCategories = [...new Set(channels.map(channel => channel.group || 'Uncategorized'))];
+        uniqueCategories.forEach((category, index) => {
+          categoryMap[String(index + 1)] = category;
+        });
+        console.log('分类映射表:', categoryMap);
+        
         // 过滤指定分类的频道
-        const filteredChannels = category_id ? 
-          channels.filter(channel => channel.group === category_id) : 
-          channels;
+        let filteredChannels;
+        if (category_id) {
+          // 如果提供了分类ID，查找对应的分类名称
+          const categoryName = categoryMap[category_id];
+          console.log(`查找分类ID ${category_id} 对应的分类名称: ${categoryName}`);
+          
+          if (categoryName) {
+            filteredChannels = channels.filter(channel => (channel.group || 'Uncategorized') === categoryName);
+          } else {
+            // 如果找不到对应的分类名称，尝试直接用分类ID匹配
+            filteredChannels = channels.filter(channel => (channel.group || 'Uncategorized') === category_id);
+          }
+        } else {
+          // 如果没有提供分类ID，返回所有频道
+          filteredChannels = channels;
+        }
         
         console.log(`过滤后 ${filteredChannels.length} 个频道`);
         
         // 格式化为XStream格式
-        const formattedChannels = filteredChannels.map((channel, index) => ({
-          num: index + 1,
-          name: channel.title,
-          stream_type: 'live',
-          stream_id: index + 1,
-          stream_icon: channel.logo || '',
-          epg_channel_id: channel.title,
-          added: new Date().toISOString().split('T')[0],
-          category_id: channel.group,
-          custom_sid: '',
-          tv_archive: 0,
-          direct_source: channel.url,
-          tv_archive_duration: 0
-        }));
+        const formattedChannels = filteredChannels.map((channel, index) => {
+          // 查找频道分类对应的ID
+          let categoryId = '1'; // 默认分类ID
+          const channelCategory = channel.group || 'Uncategorized';
+          
+          // 反向查找分类ID
+          for (const [id, name] of Object.entries(categoryMap)) {
+            if (name === channelCategory) {
+              categoryId = id;
+              break;
+            }
+          }
+          
+          return {
+            num: index + 1,
+            name: channel.title || 'Unknown Channel',
+            stream_type: 'live',
+            stream_id: index + 1,
+            stream_icon: channel.logo || '',
+            epg_channel_id: channel.title || '',
+            added: new Date().toISOString().split('T')[0],
+            category_id: categoryId,
+            custom_sid: '',
+            tv_archive: 0,
+            direct_source: channel.url,
+            tv_archive_duration: 0
+          };
+        });
         
+        console.log(`返回 ${formattedChannels.length} 个直播流`);
         res.json(formattedChannels);
       } catch (error) {
         console.error('获取直播流错误:', error);
